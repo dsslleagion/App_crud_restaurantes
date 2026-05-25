@@ -1,0 +1,441 @@
+Como o projeto funciona
+
+O aplicativo é dividido em partes.
+Cada arquivo tem uma responsabilidade específica.
+
+A arquitetura ficou assim:
+
+Usuário → MainActivity → DAO → Room → SQLite
+
+Fluxo:
+
+Usuário digita os dados
+MainActivity recebe
+DAO envia para o Room
+Room salva no SQLite
+RecyclerView mostra os dados
+1. Restaurant.kt (Entity)
+O que é
+
+Essa classe representa uma tabela do banco de dados.
+
+Ela funciona como um “molde”.
+
+Cada objeto criado vira um registro dentro do SQLite.
+
+Código
+@Entity(tableName = "restaurants")
+data class Restaurant(
+    @PrimaryKey(autoGenerate = true)
+    val id: Int = 0,
+
+    val nome: String,
+    val endereco: String,
+    val telefone: String
+)
+Explicação linha por linha
+@Entity
+@Entity(tableName = "restaurants")
+
+Diz ao Room:
+
+“Crie uma tabela chamada restaurants”
+
+data class
+data class Restaurant
+
+Classe usada para guardar dados.
+
+@PrimaryKey
+@PrimaryKey(autoGenerate = true)
+
+Define a chave primária da tabela.
+
+O autoGenerate = true faz o ID aumentar automaticamente.
+
+Exemplo:
+
+1
+2
+3
+4
+Como fica no SQLite
+
+A tabela criada será parecida com:
+
+id	nome	endereco	telefone
+1	Pizza Top	Centro	99999
+2	Sushi House	Vila	88888
+2. RestaurantDao.kt (DAO)
+O que é DAO
+
+DAO significa:
+
+Data Access Object
+
+É a classe responsável por conversar com o banco.
+
+Ela faz:
+
+INSERT
+SELECT
+DELETE
+UPDATE
+Código
+@Dao
+interface RestaurantDao {
+
+    @Insert
+    suspend fun inserir(restaurant: Restaurant)
+
+    @Query("SELECT * FROM restaurants")
+    suspend fun listar(): List<Restaurant>
+
+    @Delete
+    suspend fun deletar(restaurant: Restaurant)
+}
+Explicação
+@Dao
+@Dao
+
+Fala para o Room:
+
+“Essa interface controla o banco”
+
+Inserir
+@Insert
+suspend fun inserir(restaurant: Restaurant)
+
+Insere um restaurante.
+
+Exemplo:
+
+dao.inserir(Restaurant(...))
+SELECT
+@Query("SELECT * FROM restaurants")
+
+Executa SQL diretamente.
+
+Mesmo usando Room, ainda usamos SQL.
+
+Esse comando significa:
+
+SELECT * FROM restaurants
+
+Traduzindo:
+
+“Pegue todos os restaurantes”
+
+Retorno da lista
+List<Restaurant>
+
+Retorna vários objetos Restaurant.
+
+Delete
+@Delete
+
+Remove um registro.
+
+suspend
+
+As funções possuem:
+
+suspend
+
+Porque acesso ao banco não pode travar a interface do usuário.
+
+Então elas rodam em background usando Coroutines.
+
+3. AppDatabase.kt
+O que é
+
+Essa classe cria o banco Room.
+
+Ela conecta:
+
+Entity
+DAO
+SQLite
+Código
+@Database(entities = [Restaurant::class], version = 1)
+abstract class AppDatabase : RoomDatabase() {
+
+    abstract fun restaurantDao(): RestaurantDao
+}
+Explicação
+@Database
+@Database(
+    entities = [Restaurant::class],
+    version = 1
+)
+
+Define:
+
+quais tabelas existem
+versão do banco
+entities
+entities = [Restaurant::class]
+
+Diz:
+
+“A tabela Restaurant pertence ao banco”
+
+version
+version = 1
+
+Versão do banco.
+
+Se mudar estrutura depois:
+
+1 → 2
+
+o Room entende que houve atualização.
+
+RoomDatabase
+RoomDatabase()
+
+Classe principal do Room.
+
+DAO dentro do banco
+abstract fun restaurantDao(): RestaurantDao
+
+Permite acessar o DAO.
+
+4. activity_main.xml
+O que é
+
+É a tela do aplicativo.
+
+Define:
+
+EditText
+Botão
+RecyclerView
+Estrutura
+LinearLayout
+ ├── EditText
+ ├── EditText
+ ├── EditText
+ ├── Button
+ └── RecyclerView
+EditText
+<EditText
+    android:id="@+id/edtNome"
+/>
+
+Campo de texto.
+
+Button
+<Button
+    android:id="@+id/btnSalvar"
+/>
+
+Botão para salvar.
+
+RecyclerView
+<androidx.recyclerview.widget.RecyclerView
+
+Lista dinâmica.
+
+Mostra os restaurantes cadastrados.
+
+5. item_restaurant.xml
+O que é
+
+Layout de cada item da lista.
+
+Cada restaurante usa esse modelo visual.
+
+Exemplo visual
+Pizza Top
+Centro
+99999
+
+[Excluir]
+RecyclerView funciona assim
+RecyclerView
+   ├── item_restaurant
+   ├── item_restaurant
+   ├── item_restaurant
+
+Ela reutiliza componentes para economizar memória.
+
+Por isso o nome:
+
+Recycler
+6. RestaurantAdapter.kt
+O que é
+
+Conecta:
+
+Lista de dados → RecyclerView
+
+Sem Adapter a RecyclerView não sabe mostrar nada.
+
+Fluxo
+Banco → Lista → Adapter → RecyclerView
+Classe principal
+class RestaurantAdapter
+
+Adapter da RecyclerView.
+
+ViewHolder
+inner class RestaurantViewHolder
+
+Guarda os componentes do item.
+
+Exemplo:
+
+txtNome
+txtEndereco
+btnExcluir
+onCreateViewHolder
+override fun onCreateViewHolder
+
+Cria o layout do item.
+
+onBindViewHolder
+override fun onBindViewHolder
+
+Coloca os dados na tela.
+
+Exemplo:
+
+holder.binding.txtNome.text = restaurant.nome
+itemCount
+override fun getItemCount()
+
+Quantidade de itens da lista.
+
+7. MainActivity.kt
+O que é
+
+É a tela principal e o “cérebro” do app.
+
+Ela controla:
+
+clique do botão
+salvar
+listar
+excluir
+atualizar RecyclerView
+ViewBinding
+binding = ActivityMainBinding.inflate(layoutInflater)
+
+Permite acessar os componentes sem:
+
+findViewById()
+Banco Room
+db = Room.databaseBuilder(
+
+Cria o banco.
+
+Nome do banco
+"restaurant-db"
+
+Nome do arquivo SQLite criado no celular.
+
+LayoutManager
+LinearLayoutManager(this)
+
+Define que a lista será vertical.
+
+Botão salvar
+binding.btnSalvar.setOnClickListener
+
+Executa quando clicar no botão.
+
+Pegando textos
+val nome = binding.edtNome.text.toString()
+
+Lê o que usuário digitou.
+
+Criando objeto
+val restaurant = Restaurant(...)
+
+Cria um restaurante em memória.
+
+Coroutine
+CoroutineScope(Dispatchers.IO).launch
+
+Executa banco em thread secundária.
+
+IO significa:
+
+Input/Output
+
+Usado para:
+
+banco
+internet
+arquivos
+Inserindo no banco
+db.restaurantDao().inserir(restaurant)
+
+Salva no SQLite.
+
+withContext(Main)
+withContext(Dispatchers.Main)
+
+Volta para thread principal para atualizar interface.
+
+carregarLista()
+
+Função responsável por:
+
+buscar restaurantes
+atualizar RecyclerView
+Listando dados
+val lista = db.restaurantDao().listar()
+
+Busca tudo do banco.
+
+Atualizando RecyclerView
+binding.recyclerView.adapter =
+    RestaurantAdapter(lista)
+
+Envia dados para lista visual.
+
+Exclusão
+db.restaurantDao().deletar(restaurant)
+
+Remove do banco.
+
+Arquitetura final do projeto
+MainActivity
+    ↓
+RestaurantDao
+    ↓
+Room
+    ↓
+SQLite
+O que o Room faz automaticamente
+
+Sem Room você teria que escrever:
+
+CREATE TABLE
+INSERT INTO
+SELECT
+DELETE
+
+manualemente usando SQLite.
+
+O Room automatiza tudo.
+
+Vantagens do Room
+
+✅ Menos código
+✅ Mais seguro
+✅ Menos SQL manual
+✅ Integra com Kotlin
+✅ Mais moderno
+✅ Menos erros
+
+Tecnologias usadas
+Tecnologia	Função
+Kotlin	Linguagem
+Room	ORM Android
+SQLite	Banco local
+RecyclerView	Lista
+ViewBinding	Acesso aos componentes
+Coroutines	Background threads
